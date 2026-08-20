@@ -32,11 +32,12 @@ const publicRoutes = require('./routes/public');
 const db = require('./models');
 const autoSeed = require('./autoseed');
 
-// Helper to seed /tmp DB on Vercel if needed
+// Helper to seed /tmp DB on Vercel if needed (SQLite-only, no-op with Postgres)
 let initialized = false;
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const ensureDbInit = async () => {
     if (initialized) return;
-    if (process.env.VERCEL) {
+    if (process.env.VERCEL && !process.env.DATABASE_URL) {
         const tmpDb = '/tmp/database.sqlite';
         const sourceDb = path.join(__dirname, 'database.sqlite');
         if (!fs.existsSync(tmpDb) && fs.existsSync(sourceDb)) {
@@ -47,9 +48,24 @@ const ensureDbInit = async () => {
             }
         }
     }
-    await db.sequelize.sync({ force: false });
-    
-    // Auto-migrate to add missing columns
+
+    // Retry sync to absorb transient races when several serverless instances
+    // cold-start against the same database at the same time.
+    let lastErr;
+    for (let attempt = 1; attempt <= 5; attempt++) {
+        try {
+            await db.sequelize.sync({ force: false });
+            lastErr = null;
+            break;
+        } catch (e) {
+            lastErr = e;
+            console.error(`DB sync attempt ${attempt} failed:`, e.message);
+            await sleep(800 * attempt);
+        }
+    }
+    if (lastErr) throw lastErr;
+
+    // Auto-migrate to add missing columns (Postgres-safe syntax)
     try {
         const qi = db.sequelize.getQueryInterface();
         const cols = await qi.describeTable('Products');
@@ -67,7 +83,7 @@ const ensureDbInit = async () => {
     } catch (migErr) {
         console.error('Migration warning (non-fatal):', migErr.message);
     }
-    
+
     await autoSeed(db);
     initialized = true;
 };
