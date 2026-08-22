@@ -80,6 +80,17 @@ const ensureDbInit = async () => {
                 console.log('Migration: added column Products.' + m.col);
             }
         }
+        // Media table base64 support for 300 images
+        try {
+            const mediaCols = await qi.describeTable('Media');
+            if (!mediaCols['imageBase64']) {
+                await db.sequelize.query('ALTER TABLE "Media" ADD COLUMN "imageBase64" TEXT');
+                console.log('Migration: added column Media.imageBase64');
+            }
+        } catch (e) {
+            // Media table may not exist yet (first sync will create it)
+            if (!e.message.includes('does not exist')) console.error('Media migration warning:', e.message);
+        }
     } catch (migErr) {
         console.error('Migration warning (non-fatal):', migErr.message);
     }

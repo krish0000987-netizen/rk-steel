@@ -8,11 +8,19 @@ const Media = () => {
     const [msg, setMsg] = useState('');
     const [uploading, setUploading] = useState(false);
 
+    const getMediaSrc = (m) => {
+        if (m.imageBase64) return `/image/media/${m.id}`;
+        if (m.path && m.path.startsWith('http')) return m.path;
+        if (m.path && m.path.startsWith('/image/')) return m.path;
+        if (m.path) return m.path;
+        return `/image/media/${m.id}`;
+    };
+
     const fetchMedia = () => {
         api.get('/media').then(res => {
             setMedia(res.data);
             setLoading(false);
-        });
+        }).catch(() => setLoading(false));
     };
 
     useEffect(() => {
@@ -83,14 +91,14 @@ const Media = () => {
                 {media.map(m => (
                     <div key={m.id} className="admin-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                         <div style={{ height: '160px', background: 'var(--main-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '1px solid var(--border)', position: 'relative' }}>
-                            <img src={m.path} alt={m.filename} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                            <img src={getMediaSrc(m)} alt={m.filename} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} onError={e => e.target.style.display='none'} />
                         </div>
                         <div style={{ padding: '1.25rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                             <p style={{ fontWeight: 600, marginBottom: '0.25rem', wordBreak: 'break-all', fontSize: '0.875rem' }}>{m.filename}</p>
                             <p style={{ fontSize: '0.75rem', color: 'var(--main-text-secondary)', marginBottom: '1rem' }}>{(m.size / 1024).toFixed(1)} KB</p>
                             
                             <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
-                                <button onClick={() => navigator.clipboard.writeText(m.path)} className="btn btn-outline" style={{ flex: 1, padding: '0.4rem', fontSize: '0.75rem' }} title="Copy Path">
+                                <button onClick={() => navigator.clipboard.writeText(getMediaSrc(m))} className="btn btn-outline" style={{ flex: 1, padding: '0.4rem', fontSize: '0.75rem' }} title="Copy Path">
                                     <Copy size={14} /> Copy
                                 </button>
                                 <button onClick={() => handleDelete(m.id, m.filename)} className="btn btn-outline btn-danger" style={{ flex: 1, padding: '0.4rem', fontSize: '0.75rem' }} title="Delete">

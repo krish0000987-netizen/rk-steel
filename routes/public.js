@@ -81,4 +81,25 @@ router.get('/image/product/:id', async (req, res) => {
     }
 });
 
+router.get('/image/media/:id', async (req, res) => {
+    try {
+        const media = await db.Media.findByPk(req.params.id);
+        if (!media || !media.imageBase64) {
+            return res.status(404).send('Image not found');
+        }
+        const matches = media.imageBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (!matches || matches.length !== 3) {
+            return res.status(400).send('Invalid image data');
+        }
+        const mimeType = matches[1];
+        const buffer = Buffer.from(matches[2], 'base64');
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+        res.send(buffer);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+});
+
 module.exports = router;
